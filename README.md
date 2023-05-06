@@ -4,7 +4,7 @@ ti994a-rom-grom-ram-and-floppy-emulator
 ROM, GROM, 32K RAM expansion and FDC controller emulator for the TI99/4A computer
 using a stm32f407 board.
 
-More info at  https://www.kernelcrash.com/
+More info at   https://www.kernelcrash.com/blog/the-ti-99-4a
 
 Heavily based on all the other rom/fdc emulators at https://www.kernelcrash.com
 
