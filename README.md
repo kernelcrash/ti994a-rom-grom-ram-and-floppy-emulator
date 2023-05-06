@@ -64,7 +64,7 @@ Pins 1 and 2 are closest to the front of the TI 99/4A
       18  A9 - PE6        17  A7 - PE8
       20  A2 - PE13       19  A15 - PE0
       22  CRUCLK - PC3    21  GND - GND
-      24  03 CLK          23  GND - GND
+      24  03_CLK          23  GND - GND
       26  _WE - PC1       25  GND
       28  _MBE            27  GND
       30  A1 - PE14       29  A6 - PE9
@@ -133,17 +133,17 @@ FAT32.
 
 Power on the stm32f407 board first. Then power on the TI 99/4A. Once you 'press a key' you should see KCTFS as the number 2 option. Select it. You should then
 get a paged listed of the directories you created on the SD card. The order is 'the order you created the directories in'. To select a program, just hit
-a letter key and the TI-99/4A should reboot. If you 'press a key' you should see 1. TI BASIC and 2. <the thing you selected in the kctfs menu>. Press '2' to 
+a letter key and the TI-99/4A should reboot. If you 'press a key' you should see 1. TI BASIC and 2. "the thing you selected in the kctfs menu". Press '2' to 
 start your application.
 
-After you've run a program you can try to reset the TI-99/4A with FCTN-= or if that does not work, turn the TI-99/4A off and on. If you presed a key, 
+After you've run a program you can try to reset the TI-99/4A with FCTN-= or if that does not work, turn the TI-99/4A off and on. If you pressed a key, 
 you would see the same program you last ran in the list (assuming the stm32f407 board is powered seperately). If you want to get back to the KCTFS menu, 
 press the MENU button, then press FCTN-= on the TI-99/4A. The TI/99-4A should reboot and then you can select KCTFS again.
 
 The NEXT and PREV buttons allow you to step through the directories on the SD card without having to go back to the KCTFS menu. Again, they are in the
 order you created the directories.
 
-You can haveup to three disk images at the moment, and those disks will appear as DSK1, DSK2 and DSK3. Primary support is for the raw 92160 byte disk images,
+You can have up to three disk images at the moment, and those disks will appear as DSK1, DSK2 and DSK3. Primary support is for the raw 92160 byte disk images,
 but 184320 byte DSSD images should also work.
 
 Many games require TI Extended Basic to autoboot. I found v2.5 tended to work best for me, so use that. In theory you would need to have a copy
@@ -175,7 +175,7 @@ KCTFS
 
 KCTFS is a native 9900 assembly program to present a menu of the directories under the 'ti994a' directory on the SD card. It interacts 
 with the stm32f407 board by using the 5fe0 to 5fee addresses just below the addresses for the Floppy Disk Controller. There is a simple
-protocol that allows it to ask the stm32f407 to generate a directoy listing, then get the content of that listing and then once
+protocol that allows it to ask the stm32f407 to generate a directory listing, then get the content of that listing and then once
 a user selects an item, the items name is written back to the stm32f07 and a command is issued to 'swap the program out' and reset the
 TI-99/4A.
 
