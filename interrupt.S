@@ -1529,13 +1529,17 @@ menu_ctrl_command_read:
 	b	memen_loop_wait
 
 menu_ctrl_file_count_lsb_read:
+	mov32	r3,#menu_ctrl_file_count
+	// low byte
+	ldrb	r1,[r3]
+	b	menu_ctrl_file_count_read
+
 menu_ctrl_file_count_msb_read:
 	mov32	r3,#menu_ctrl_file_count
-	//ands	r0,#0x01
-	ldrb	r1,[r3]
-
+	// high byte
+	ldrb	r1,[r3,1]
+menu_ctrl_file_count_read:
 // get it out on the bus early
-
 	lsls	r1,#8
 	vmov	r0,reg_moder_dataout
         str     r1,[r2, C_TO_D_OFFSET + ODR] // GPIOD ODR

@@ -655,7 +655,7 @@ int __attribute__((optimize("O0")))  main(void) {
 				}
 				case (MAIN_THREAD_COMMAND_LOAD_DIRECTORY): {
 					main_thread_command_reg |= MAIN_COMMAND_IN_PROGRESS;
-					menu_ctrl_file_count = load_directory(root_directory,(unsigned char *)(CCMRAM_BASE+MENU_DIRCACHE_OFFSET+MENU_LISTING_BASE));
+					menu_ctrl_file_count = load_directory(root_directory,(uint16_t *)(CCMRAM_BASE+MENU_DIRCACHE_OFFSET+MENU_LISTING_OFFSETS), MENU_MAX_DIRECTORY_ITEMS, MENU_LISTING_OFFSETS );
 	
 					main_thread_command_reg |= MAIN_COMMAND_LOAD_DIRECTORY_COMPLETE;
 					break;

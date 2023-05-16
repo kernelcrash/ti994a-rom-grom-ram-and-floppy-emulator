@@ -178,11 +178,19 @@
 
 #define RAM_EXPANSION_OFFSET		0x8000		// 0x8000 is effectively hard coded for the 32K expansion base, but this define is here to help calculate how many filenames we can potentially load in
 // storage for the directory and filename (for writing)
+
+// The file listing uses a block of ram in the first 32K of CCMRAM. This 'block' starts at MENU_DIRCACHE_OFFSET into CCMRAM. From the TI's perspective, this 
+// corresponds to location 0x0000 in the menu interface address register. As 0x0000 is usuall the location the TI will write the filename that a user
+// has selected, the actual file listing is in two sections higher up. The first part; an array of 16 bit offsets starts at MENU_LISTING_OFFSETS into the 'block'
+// There are a total of MENU_MAX_DIRECTORY_ITEMS 16bit offset words. Immediately after this array at MENU_LISTING_STRINGS  are all the filenames null seperated from each other 
+// Each 16 bit offset points to one of these null terminated strings. 
 #define MENU_DIRCACHE_OFFSET		0x1000		// You need enough room to load a lot of files less than 0x8000 where the emulated 32K ram starts
-#define MENU_LISTING_BASE		0x100		// So the TI needs to write this address register to the menu address register to access the listings
+#define MENU_LISTING_OFFSETS		0x100
+#define MENU_MAX_DIRECTORY_ITEMS	1024
+#define MENU_LISTING_STRINGS		(MENU_LISTING_OFFSETS+(2*MENU_MAX_DIRECTORY_ITEMS))
+
+#define MENU_LISTING_BASE		0x100		// So the TI needs to write this to the address register to access the table of 16bit offsets
 #define MENU_LOAD_FILE_BASE		0x0 		// The TI needs to write this to the address register before writing the filename you want to load
-#define MENU_SIZEOF_FILENAME_ENTRY	0x80
-#define MAX_MENU_FILENAMES		(RAM_EXPANSION_OFFSET-MENU_DIRCACHE_OFFSET)/MENU_SIZEOF_FILENAME_ENTRY
 
 //
 // ---------------

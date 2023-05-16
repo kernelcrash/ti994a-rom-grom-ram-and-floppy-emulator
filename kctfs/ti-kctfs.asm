@@ -42,6 +42,7 @@ FDC_CRU_BASE		equ	>1100
 
 MENU_STATUS		equ	>5fe0
 MENU_COUNT_LSB		equ	>5fe2
+MENU_COUNT_MSB		equ	>5fe4
 MENU_DATA_READ		equ	>5fe6
 
 MENU_COMMAND		equ	>5fe8
@@ -60,7 +61,7 @@ CHARACTERS_TO_SKIP_PER_LINE	equ 32
 
 top_line_message:
 	;     12345678901234567890123456789012
-	text 'KCTFS 0.16              PAGE x  '
+	text 'KCTFS 0.21              PAGE x  '
 	byte 0
 
 bottom_line_message:
@@ -68,11 +69,13 @@ bottom_line_message:
 	byte 0
 
 help_page:
-	text 'A - T  - SELECT AND RESET'
+	text 'A - T     - SELECT AND RESET'
 	byte 0
-	text '1 - 9  - CHANGE PAGE'
+	text '1 - 9, 0  - CHANGE PAGE'
 	byte 0
-	text '/      - HELP'
+	text '=         - NEXT 10 PAGES'
+	byte 0
+	text '/         - HELP'
 	byte 0
 	text ' '
 	byte 0
@@ -100,7 +103,7 @@ start:
 	bl	@display_bottom_line
 
 
-	; write a 'W' (for wait) on the top line to saw we are waiting for the stm32f4 to produce the whole directory listing
+	; write a 'W' (for wait) on the top line to say we are waiting for the stm32f4 to produce the whole directory listing
 	li	r0,12
 	li	r1,'W '
 	bl	@vsbw
@@ -128,6 +131,7 @@ dir_load_is_finished:
 
 	movb	@MENU_COUNT_LSB,r9
 	srl	r9,8
+	movb	@MENU_COUNT_MSB,r9
 	li	r8,1			; start at page 1
 	clr	r7			; prime for the first key press
 
@@ -156,21 +160,45 @@ key_down:
 	jmp	wait_for_key
 
 !not_help:
+	ci	r1,'='
+	jne	!try_numbers
+; '=' key cycles between sets of 10 pages
+	ci	r8,10
+	jh	!page_set2
+; already on pages 1 to 10, so switch to pages 11 to 20
+	ai	r8,10
+	jmp	!try_numbers
+!page_set2:
+; switch to pages 1 to 10
+	ai	r8,-10
+	jmp	main_loop
+
+!try_numbers:
 	ci	r1,'0'
-	jle	main_loop
+	jl	main_loop
 	ci	r1,'9'
-	jgt	try_letters
+	jh	try_letters
 ; should be a number selected
 	ai	r1,-'0'
+	jne	not_zero
+	li	r1,10			; the '0' key is like 'page 10'
+not_zero:
+; work out which page set we are on
+	ci	r8,10
+	jh	!adjust_page_set2
+; must be in page set 1
 	mov	r1,r8
-	; TODO
-	;bl	@update_page_number
 	jmp	main_loop
+!adjust_page_set2
+	mov	r1,r8
+	ai	r8,10
+	jmp	main_loop
+
 try_letters:
-	ci	r1,('A'-1)
-	jle	main_loop
+	ci	r1,'A'
+	jl	main_loop
 	ci 	r1,'A' + MENU_ITEMS_PER_PAGE
-	jgt	main_loop
+	jh	main_loop
 ; Should be a key from 'A' to 'something'
 	ai	r1,-'A'				; subtract 'A'
 	mov	r8,r0
@@ -179,13 +207,27 @@ try_letters:
 	ai	r1,MENU_ITEMS_PER_PAGE
 	jmp	-!
 adjust_page_offset_done:
-	sla	r1,7				; multiple by 128
+; find the 16 bit offset related to the selected entry
+	sla	r1,1				; multiple by 2
 	ai	r1,MENU_FNAME_BASE_ADDRESS
 	mov	r1,r6
 	movb	r6,@MENU_ADDRESS_MSB	; MSB
 	mov	r6,r0
 	sla	r0,8
 	movb	r0,@MENU_ADDRESS_LSB	; LSB
+
+; grab the address of the string from the table
+	clr	r1
+	movb	@MENU_DATA_READ,r1	; MOVB will shove the byte in the MSB, but this first byte is the LSB
+	swpb	r1
+	movb	@MENU_DATA_READ,r1	; get the MSB
+
+; Using the offset we grabbed, set the new address to point to the actual string
+	movb	r1,@MENU_ADDRESS_MSB	; MSB
+	mov	r1,r0
+	sla	r0,8
+	movb	r0,@MENU_ADDRESS_LSB	; LSB
+
 	li	r5,SCRATCH_RAM		; scratch ram
 select_fname1:
 	movb	@MENU_DATA_READ,r1
@@ -262,7 +304,6 @@ next_help_line:
 
 	li	r3,29					; max of 29 chars of visible filename
 !	movb	*r6+,r0
-	;andi	r0,>ff00
 	jeq	!end_of_line
 	movb	r0,@vdpwd
 	dec	r3
@@ -277,7 +318,6 @@ next_help_line:
 	ai	r4,CHARACTERS_TO_SKIP_PER_LINE
 	dec	r5					; lines left
 	movb	*r6,r0
-	;andi	r0,>ff00
 	jne	next_help_line
 ; fill lines with blanks
 next_blank_help_line:
@@ -301,39 +341,79 @@ next_blank_help_line:
 ; R8 is the page number (1 is the first page)
 display_page:
 	; First update the page number
-	li	r0,30					; top line to the far right
+	li	r0,29					; top line to the far right
 	ori	r0, >4000
 	swpb r0
 	movb r0, @vdpwa
 	swpb r0
 	movb r0, @vdpwa
 	mov	r8,r1
+	ci	r1,9
+	jh	!two_digit_page_number
+; write a space
+	li	r0,'  '
+	movb	r0,@vdpwd
+	sla	r1,8
+	ai	r1,'0 '
+	movb	r1,@vdpwd
+	jmp	work_out_top_of_page
+!two_digit_page_number:
+	ci	r1,19
+	jh	!page_twenty
+	li	r0,'1 '
+	movb	r0,@vdpwd
+	ai	r1,-10
+	sla	r1,8
+	ai	r1,'0 '
+	movb	r1,@vdpwd
+	jmp	work_out_top_of_page
+!page_twenty:
+	li	r0,'2 '
+	movb	r0,@vdpwd
+	ai	r1,-20
 	sla	r1,8
 	ai	r1,'0 '
 	movb	r1,@vdpwd
 
-
+work_out_top_of_page:
+; work out the top of the page
 	mov	r9,r2					; r2 is how many files we retrieved overall
 	li	r6,MENU_FNAME_BASE_ADDRESS		; index into the stm32f4's table of filenames
 	mov	r8,r5
 !	dec	r5					; make it a page number from 0 to x
 	jeq	!pages_done
 	ci	r2,10
-	jlt	blank_whole_page
+	jl	blank_whole_page
 	ai	r2,-MENU_ITEMS_PER_PAGE
-	ai	r6,(MENU_ITEMS_PER_PAGE*128)
+	ai	r6,(MENU_ITEMS_PER_PAGE*2)		; 2 byte offset per file entry
 	jmp	-!
 !pages_done:
 	inc	r2
 	li	r4,(2*32+1)				; r4 is screen location. 3rd line indented by 1
 	clr	r5					; first entry on the page is r5=0
-next_filename:
-	dec	r2
-	jeq	blank_rest_of_page
+
+; get the offset for the first line at the top of the page
 	movb	r6,@MENU_ADDRESS_MSB	; MSB
 	mov	r6,r0
 	sla	r0,8
 	movb	r0,@MENU_ADDRESS_LSB	; LSB
+
+	clr	r1
+	movb	@MENU_DATA_READ,r1	; MOVB will shove the byte in the MSB, but this first byte is the LSB
+	swpb	r1
+	movb	@MENU_DATA_READ,r1	; get the MSB
+
+
+	; Using the offset we grabbed, set the new address to point to the actual string
+	movb	r1,@MENU_ADDRESS_MSB	; MSB
+	mov	r1,r0
+	sla	r0,8
+	movb	r0,@MENU_ADDRESS_LSB	; LSB
+
+next_filename:
+	dec	r2
+	jeq	blank_rest_of_page
+	
 
 ; set the VDP address
 	mov	r4,r0
@@ -355,7 +435,7 @@ next_fname_byte:
 	andi	r1,>ff00
 	jeq	pad_rest_of_line
 	ci	r1,>6100
-	jlt	case1
+	jl	case1
 	; probably lowercase, so make uppercase
 	andi	r1,>df00
 case1:	movb	r1,@vdpwd
@@ -368,7 +448,6 @@ pad_rest_of_line:
 	dec	r3
 	jne	-!
 end_of_line:
-	ai	r6,128
 	ai	r4,CHARACTERS_TO_SKIP_PER_LINE
 	inc	r5
 	ci	r5,MENU_ITEMS_PER_PAGE

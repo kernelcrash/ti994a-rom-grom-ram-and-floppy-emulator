@@ -19,6 +19,7 @@ uint32_t suffix_match(char *name, char *suffix);
 FRESULT load_rom(char *fname, unsigned char* buffer, uint32_t max_size, uint32_t blank_remaining) ;
 void load_rom_and_grom_and_disk_name(char *app_directory, unsigned char*rom_buffer, unsigned char *grom_buffer, DSK *dsk);
 
-uint32_t load_directory(char *dirname, unsigned char *buffer);
+uint32_t load_directory(char *dirname, uint16_t *index_buffer, uint32_t max_files,  uint32_t base_offset);
+
 
 #endif

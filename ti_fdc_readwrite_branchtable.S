@@ -2,7 +2,7 @@ ti_branchtable_fdc:
 // READS
 	.short     ((menu_ctrl_command_read - ti_branchtable_fdc)/2) /* 0x5fe0 Menu Command Read */
 	.short     ((menu_ctrl_file_count_lsb_read - ti_branchtable_fdc)/2) /* 0x5fe2 Menu File Count LSB */
-	.short     ((menu_ctrl_unused_read - ti_branchtable_fdc)/2) /* 0x5fe4 unused */
+	.short     ((menu_ctrl_file_count_msb_read - ti_branchtable_fdc)/2) /* 0x5fe4 Menu File Count MSB */
 	.short     ((menu_ctrl_data_register_read - ti_branchtable_fdc)/2) /* 0x5fe6 Menu Data Read */
 
 // WRITES

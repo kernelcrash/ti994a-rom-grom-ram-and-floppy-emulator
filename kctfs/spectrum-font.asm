@@ -58,3 +58,4 @@ font:
   BYTE >00, >42, >24, >18, >18, >24, >42, >00     ; 88 X
   BYTE >00, >82, >44, >28, >10, >10, >10, >00     ; 89 Y
   BYTE >00, >7e, >04, >08, >10, >20, >7e, >00     ; 90 Z
+; I did actually look at loading lowercase as well but it noticeably slows the menu startup
