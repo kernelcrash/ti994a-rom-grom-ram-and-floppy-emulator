@@ -307,7 +307,7 @@ I depended on a lot of online resources. Some I will note below:
 - Some Assembly books ; 'Introduction to assembly language for the ti home computer' and 'Learning ti994a home computer assembly language programming'
 - ChibiAkumas TMS9900 pages ; https://www.chibiakumas.com/tms9900/
 - The xdt99 cross dev tools ; http://endlos99.github.io/xdt99/
-- The ti99sim ; https://www.chibiakumas.com/tms9900/
+- The ti99sim ; https://mrousseau.org/programs/ti99sim/
 
 As always thanks to all the other projects, especially fMSX that I have used for these floppy emulator projects
 
