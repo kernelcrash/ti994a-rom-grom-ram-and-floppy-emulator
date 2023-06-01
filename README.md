@@ -260,8 +260,10 @@ The main flag is the ENABLE_PCARD one, but the ENABLE_PCARD_ACTIVITY_LED flag
 will flicker PA1 when there is activity to the PCARD (the PCARD can be slow so
 this is to give some hint that it hasn't crashed).
 
+```
 CFLAGS += -DENABLE_PCARD
 CFLAGS += -DENABLE_PCARD_ACTIVITY_LED
+```
 
 You will need the file dumps of the ROMs and GROMs in the pcard. And you'll
 need the DSK images for the disks you want to use (they have to be normal
