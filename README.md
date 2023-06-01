@@ -2,7 +2,7 @@ ti994a-rom-grom-ram-and-floppy-emulator
 =======================================
 
 ROM, GROM, 32K RAM expansion and FDC controller emulator for the TI99/4A computer
-using a stm32f407 board.
+using a stm32f407 board. Also can emulate the p-card.
 
 More info at   https://www.kernelcrash.com/blog/the-ti-99-4a
 
@@ -12,7 +12,9 @@ Heavily based on all the other rom/fdc emulators at https://www.kernelcrash.com
 Overview
 --------
 - Emulates ROMs, GROMS, the 32K expansion and the TI Floppy controller with three drives attached.
-- Take a cheap STM32F407 board (US$10 or so 'before the chip shortage'). ebay/aliexpress list several different stm32f407vet6/vgt6 boards with micro-SD adapters. Wire it directly to the TI 99/4A IO connector on the right hand side.
+- Take a cheap STM32F407 board (US$10 or so 'before the chip shortage'). ebay/aliexpress list several
+  different stm32f407vet6/vgt6 boards with micro-SD adapters. Wire it directly to the
+  TI 99/4A IO connector on the right hand side.
 - Make a FAT32 partition on a micro SD card and put rom and dsk disk images on it.
 - Plug the micro SD into the STM32F4 board.
 - The STM32F4 board presents a rom, groms, the 32k expansion and the Floppy Controller in real time 
@@ -179,34 +181,62 @@ protocol that allows it to ask the stm32f407 to generate a directory listing, th
 a user selects an item, the items name is written back to the stm32f07 and a command is issued to 'swap the program out' and reset the
 TI-99/4A.
 
-The protocol works like this
+The protocol works like this (NB: this is different to earlier versions)
 
  - kctfs writes an 0x80 to 0x5fe8. That triggers the main thread of the
-   smt32f4 board to do a directory listing of the 'ti994a' directory.
+   stm32f4 board to do a directory listing of the 'ti994a' directory.
    The stm32f4 board will write this directory listing into its own
-   memory in a series of 128 byte filename chunks.
+   memory in the form of two structures. One a list of 16bit offsets to
+   filename strings, and another all the filename strings together.
 
  - kctfs polls 0x5fe0 to see when bit 7 goes low. That means the file listing
-   process has completed. The number of directory names retrieved is written to 0x5fea.
-   KCTFS can only really show about 9 or 10 pages of 20 entries, so its
-   theoretical limit is about 200 entries.
+   process has completed. kctfs now writes a sort of magic 0x33 to 0x5fe8
+   to close out the directory load command.
 
- - the list of subdirectories in the 'ti994a' directory is accessed by a paging
-   mechanism. 0x5fea and 0x5fec are an address register into the stm32f4's
-   memory where the filenames are stored in 128 byte chunks. The first
-   filename is at offset 0x0100, the 2nd at 0x0180 and so on. So the TI-99/4A
-   just needs to write 0x0100 to the 0x5fea/0x5fec address register, then
-   start to read the bytes of the directory name from 0x5fe6. There is a built in
-   autoincrement function , so the TI-99/4A can just continue to read from 0x5fe6
-   until it gets a 0x00 byte to signify the end of the directory name.
-   The TI-99/4A would then write a 0x0180 to the 0x5fea/0x5fec address register
-   and would start to read the 2nd filename and so on. I will note that 0x5fea is
-   the low byte, and 0x5fec is the high byte of the address.
+ - kctfs now reads a count of the number of files in the directory. 0x5fe2 is
+   the LSB, 0x5fe4 is MSB. There is a limit to the number of files as
+   defined by MENU_MAX_DIRECTORY_ITEMS in defines.h
+
+ - the list of subdirectories in the 'ti994a' directory is accessed by 
+   first accessing the list of 16 bit offsets, then the appropriate 
+   filename strings. To access the stm32f4's memory an address register
+   is loaded by the TI. 0x5fea (LSB) and 0x5fec (MSB) are the address
+   registers to write to. The memory map of this special 
+   address space is:
+
+     0x0000 - where to write the name of the program to load
+     0x0100 - Start of a series of 16 bit words, which are offsets into the 
+              special address space where the filename strings are stored.
+     0x0900 - Start of the filename string storage. This is just a series of
+              of null ending strings making up the contents of the 'ti994a' 
+              directory on the SD card. The last filename has two zero bytes
+              following it.
+
+   So the idea is that if you want to access the 1st filename you would:
+
+     - load the address register with 0x0100. So write 0x00 to 0x5fea and
+       0x01 to 0x5fec.
+     - Read from the data register 0x5fe6 to get the LSB, and again read
+       0x5fe6 again to get the MSB of the 16 address where the string is
+       stored (ie. the address register auto increments). Chances are you
+       would read 0x00 then 0x09, so the address of the first string would
+       be 0x0900.
+     - Write this new address to the address registers. eg. 0x00 to 0x5fea
+       and 0x09 to 0x5fec
+     - Start reading from the data register 0x5fe6 to get the bytes for the 
+       filename ending in a 0x00.
+
+   The table of 16 bit offsets makes it quick for the TI to page backwards and
+   forwards to different pages of 20 entries. 
 
  - kctfs lets a user select a file. The name selected is then copied in to the
    0x0000 offset of the stm32f4. ie. the TI-99/4A writes a 0x0000 to the
    0x5fea/0x5fec address register and then 'writes' the filename one byte
    at a time to 0x5fee including the trailing 0x00 byte.
+
+   kctfs normally runs as a ROM in the 0x6000-07fff region. It's about to
+   trigger the stm32f4 to overwrite that region, so it copies part of itself
+   into RAM and continues execution there.
 
    Then an 0x40 is written to 0x5fe8. That triggers the
    main thread of the stm32f4 board to look inside the subdirectory selected
@@ -214,8 +244,65 @@ The protocol works like this
    it will prepare that image for loading.
 
  - kctfs can poll the 0x5fe0 address to check when bit 6 goes low. That signifies
-   that the stm32f407 has finished loading from SD card. Kctfs then initiates a 
-   reset of the TI-99/4A
+   that the stm32f407 has finished loading from SD card. kctfs then needs to
+   write the magic 0x33 command to 0x5fe8 to end the command. 
+
+   Then kctfs initiates a reset of the TI-99/4A. When it reboots, the selected ROM
+   or GROM is presented to the TI-99/4A and the user selects it from the initial
+   startup menu.
+
+
+PCARD support
+-------------
+
+PCARD support is off by default. You'll need to edit the Makefile to enable it. 
+The main flag is the ENABLE_PCARD one, but the ENABLE_PCARD_ACTIVITY_LED flag
+will flicker PA1 when there is activity to the PCARD (the PCARD can be slow so
+this is to give some hint that it hasn't crashed).
+
+CFLAGS += -DENABLE_PCARD
+CFLAGS += -DENABLE_PCARD_ACTIVITY_LED
+
+You will need the file dumps of the ROMs and GROMs in the pcard. And you'll
+need the DSK images for the disks you want to use (they have to be normal
+90K or 180K ones).
+
+Basically what you do is create a new sub directory under ti994a on your
+microSD card ('pcard-test1' in the example below) and put the DSK images
+you want to use. I have the disks for Pascal. DSK1 is the Compiler (I 
+eventually worked out that USES SUPPORT; tends to prefer the compiler as
+the first disk). DSK2 is the Editor-Filer. DSK3 is the Assembler/Linker. 
+
+Next create a subdirectory below it called 'pcard' and place the required
+ROM and GROM files in it. They have to have the filenames shown below. The
+rom0 file is the 4K ROM, the rom1 file is the 8K ROM. The grom0 to 7 files
+are the eight GROM files.
+
+```
+ti994a/pcard-test1/
+ti994a/pcard-test1/COMPILER.DSK
+ti994a/pcard-test1/EDT-FIL.DSK2
+ti994a/pcard-test1/ASM-LNK.DSK3
+ti994a/pcard-test1/pcard
+ti994a/pcard-test1/pcard/pcode_grom0.u11
+ti994a/pcard-test1/pcard/pcode_grom1.u13
+ti994a/pcard-test1/pcard/pcode_grom2.u14
+ti994a/pcard-test1/pcard/pcode_grom3.u16
+ti994a/pcard-test1/pcard/pcode_grom4.u19
+ti994a/pcard-test1/pcard/pcode_grom5.u20
+ti994a/pcard-test1/pcard/pcode_grom6.u21
+ti994a/pcard-test1/pcard/pcode_grom7.u22
+ti994a/pcard-test1/pcard/pcode_rom0.u1
+ti994a/pcard-test1/pcard/pcode_rom1.u18
+```
+
+Those pcard files I found in an archive for use with MAME.
+
+Now boot up the TI-99/4A. Go straight in to kctfs, find your 'pcard-test1' or
+whatever you called it and select. Now the TI-99/4A reboots and instead of the
+usual 'press any key' screen, you just have a cyan screen for quite some time
+(this is where that actiity LED comes in handy). Eventually you should see
+'System Initialised' and the top menu of the p-system.
 
 
 Technical (for the TI 99/4A)

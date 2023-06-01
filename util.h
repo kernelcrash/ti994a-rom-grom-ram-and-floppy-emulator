@@ -21,5 +21,8 @@ void load_rom_and_grom_and_disk_name(char *app_directory, unsigned char*rom_buff
 
 uint32_t load_directory(char *dirname, uint16_t *index_buffer, uint32_t max_files,  uint32_t base_offset);
 
+extern void enable_pcard(void);
+extern void disable_pcard(void);
+
 
 #endif

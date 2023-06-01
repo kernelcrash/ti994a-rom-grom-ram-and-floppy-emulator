@@ -49,6 +49,8 @@ CFLAGS += -ffixed-s0 -ffixed-s1 -ffixed-s2 -ffixed-s3 -ffixed-s4 -ffixed-s5 -ffi
 
 CFLAGS += -ffixed-r10
 
+#CFLAGS += -DENABLE_PCARD
+#CFLAGS += -DENABLE_PCARD_ACTIVITY_LED
 #CFLAGS += -DDEBUG_FDC_WRITES
 #CFLAGS += -DDEBUG_FDC_DATA_WRITE
 #CFLAGS += -DDEBUG_EXTI0

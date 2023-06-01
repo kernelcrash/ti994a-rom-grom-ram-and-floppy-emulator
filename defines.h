@@ -45,8 +45,10 @@
 #define reg_moder_dataout	s8
 #define reg_moder_datain	s9
 
+#define reg_pcard_grom_address_counter s10
+
 // All this IRQ/DRQ stuff is actually not used for the TI code
-#define reg_next_fdc_irq_drq	s10
+//#define reg_next_fdc_irq_drq	s10
 #define reg_fdc_drq_countdown	s11
 #define reg_fdc_irq_countdown	s12
 #define reg_fdc_irq_drq_state	s13
@@ -152,6 +154,9 @@
 
 #define S_LASTSTEPDIR	0x0100
 #define S_SIDE          0x0200
+#define S_CRU_PCARD_ENABLE     0x0400
+#define S_CRU_PCARD_A12        0x0800
+#define S_PCARD_PRESENT	0x40000000
 #define S_FDC_PRESENT	0x80000000
 
 #define WD1793_IRQ     0x80

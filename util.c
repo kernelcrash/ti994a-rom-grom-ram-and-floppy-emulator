@@ -62,6 +62,11 @@ void load_rom_and_grom_and_disk_name(char *app_directory, unsigned char*rom_buff
 	dsk[1].disk_filename[0]=0;
 	dsk[2].disk_filename[0]=0;
 
+#ifdef ENABLE_PCARD
+	// default is to disable the pcard, and only enable it if the PCARD subdir is found
+	disable_pcard();
+#endif
+	
 	// zero the rom and grom memory before we load anything
 	memset(rom_buffer,0,0x8000);
 	memset(grom_buffer,0,0xA000);
@@ -125,6 +130,113 @@ void load_rom_and_grom_and_disk_name(char *app_directory, unsigned char*rom_buff
 				strcpy(dsk[2].disk_filename, app_directory);
 				strcat(dsk[2].disk_filename, "/");
 				strcat(dsk[2].disk_filename, fno.fname);
+#ifdef ENABLE_PCARD
+			} else if (strncasecmp (fno.fname,"PCARD",5)==0) {
+				enable_pcard();
+				// load 4K ROM
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_rom0.u1");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,rom_buffer,0x1000,&BytesRead);
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+				// load 8K ROM
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_rom1.u18");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,&rom_buffer[0x1000],0x2000,&BytesRead);
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+				// 1st GROM
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_grom0.u11");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,grom_buffer,0x2000,&BytesRead);    // probably only a 6K file, but try reading 8K
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_grom1.u13");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,&grom_buffer[0x2000],0x2000,&BytesRead);    // probably only a 6K file, but try reading 8K
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_grom2.u14");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,&grom_buffer[0x4000],0x2000,&BytesRead);    // probably only a 6K file, but try reading 8K
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_grom3.u16");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,&grom_buffer[0x6000],0x2000,&BytesRead);    // probably only a 6K file, but try reading 8K
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_grom4.u19");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,&grom_buffer[0x8000],0x2000,&BytesRead);    // probably only a 6K file, but try reading 8K
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_grom5.u20");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,&grom_buffer[0xA000],0x2000,&BytesRead);    // probably only a 6K file, but try reading 8K
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_grom6.u21");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,&grom_buffer[0xC000],0x2000,&BytesRead);    // probably only a 6K file, but try reading 8K
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+				strcpy(fname,app_directory);
+				strcat(fname,"/pcard/");
+				strcat(fname,"pcode_grom7.u22");
+				res =  f_open(&fil, fname, FA_READ);
+				if (res == FR_OK) {
+					res = f_read(&fil,&grom_buffer[0xE000],0x2000,&BytesRead);    // probably only a 6K file, but try reading 8K
+					f_close(&fil);
+				} else {
+					blink_debug_led(200);
+				}
+#endif
 			} else {
 				// Assume its a normal ROM up to 32K in size
 				//

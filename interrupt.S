@@ -39,6 +39,8 @@
 	.global reset_rom_base_offset
 	.global	force
 	.global	deactivate_fdc
+	.global	enable_pcard
+	.global disable_pcard
 
 	.global EXTI0_IRQHandler
 	.global EXTI3_IRQHandler
@@ -137,7 +139,8 @@
 .section bss
 	.lcomm dsr_base,0x2000
 	.lcomm rom_base,0x8000
-	.lcomm grom_base,0xA000
+	//.lcomm grom_base,0xA000
+	.lcomm grom_base,0x10000
 	.lcomm track_buffer,6*SIZEOF_ONE_DISK_TRACK		// two tracks for each of the 3 disks
 	.align 4
 	.lcomm disk_header,0x08			// 6 byte read address header
@@ -446,7 +449,23 @@ deactivate_fdc:
 	vmov	reg_fdc_system,r0
 	bx	lr
 
+.type enable_pcard, %function
+.align 4
+.thumb_func
+enable_pcard:
+	vmov	r0,reg_fdc_system
+	orr	r0,#S_PCARD_PRESENT
+	vmov	reg_fdc_system,r0
+	bx	lr
 
+.type disable_pcard, %function
+.align 4
+.thumb_func
+disable_pcard:
+	vmov	r0,reg_fdc_system
+	bfc	r0,#30,#1			// set bit 30 low
+	vmov	reg_fdc_system,r0
+	bx	lr
 // --------------------------------------------------------
 // CRUCLK Handler. Int on -ve edge. 
 //  0x1100  - DSR on off
@@ -457,6 +476,10 @@ deactivate_fdc:
 //  0x110a  - DSK 2 select
 //  0x110c  - DSK 3 select
 //  0x110e  - DSK side select
+
+//  0x1f00  - PCARD enable
+//  0x1f80  - PCARD A12 (ie. highest address bit of the 2ndary 8K ROM)
+
 .type EXTI3_IRQHandler, %function
 .align 4
 .thumb_func
@@ -471,7 +494,7 @@ EXTI3_IRQHandler:
 	lsrs	r0,r1,#8
 	cmp	r0,#0x11			// ie CRU 0x11xx
 	bne	1$
-
+// FDC card
 	vmov	r3,reg_fdc_system		// get current state
 	ands	r1,#0x000f
 	lsr	r0,r1,#1		// keep r1, shift r0 to the right 
@@ -488,7 +511,39 @@ EXTI3_IRQHandler:
 
 	vmov	reg_fdc_system,r3
 
-1$:	bx	lr
+	bx	lr
+// Check PCARD
+1$:	cmp	r0,#0x1f
+	bne	2$
+	vmov	r3,reg_fdc_system		// get current state
+	tst	r3,#S_PCARD_PRESENT
+	beq	2$
+	ands	r1,#0x00ff
+	lsr	r0,r1,#1		// keep r1, shift r0 to the right 
+
+	movs	r12,#0			// set default
+	cmp	r0,#0x00		// check 1f00
+	IT	EQ
+	moveq	r12,#0x400
+
+	cmp	r0,#0x40		// check 1f80
+	IT	EQ
+	moveq	r12,#0x800
+
+	cmp	r12,#0			// if it wasnt 1f00 or 1f80 then exit
+	beq	2$
+
+	tst	r1,#0x0001
+	ITTE	EQ
+	mvneq	r12,r12
+	andeq	r3,r12
+	orrne	r3,r12
+
+	vmov	reg_fdc_system,r3
+
+2$:	bx	lr
+
+
 
 // --------------------------------------------------------
 // MEMEN Handler. Int on -ve edge. 
@@ -740,7 +795,9 @@ grom_read_address:
 
 
 
-// Emulation of the DSR ROM (4000-5fff) and FDC (sorta 5ffx) and I haev shoved the menu interface in to 5fex
+// Emulation of the DSR ROM (4000-5fff) and FDC (sorta 5ffx) and I have shoved the menu interface in to 5fex
+// Also emulate the PCARD at 4000-5fff if it is enabled
+
 dsr_block:
 #ifdef DEBUG_FDC
         vstr     reg_bit8_high,[r11,ODR]
@@ -751,7 +808,8 @@ dsr_block:
 2$:
 	vmov	r3,reg_fdc_system
 	tst	r3,#S_CRU_DSR_ROM
-	beq	memen_loop
+	beq	try_pcard
+	//beq	memen_loop
 	mov32	r0,#0x5fe0			// TODO check the extra CRU bit that enables 0x5fe0 to 5fee for the menu interface
 	cmp	r1,r0
 	bge	fdc_controller
@@ -767,7 +825,135 @@ dsr_block:
 	lsls	r0,r0,#8
 	str     r0,[r2, C_TO_D_OFFSET + ODR]
 	b	memen_loop
+try_pcard:
+	tst	r3,#S_CRU_PCARD_ENABLE
+	beq	memen_loop
 
+#ifdef ENABLE_PCARD_ACTIVITY_LED
+	ldr	r0,[r11,ODR]
+	eor	r0,#2
+	str	r0,[r11,ODR]
+#endif
+
+	mov32	r0,#0x5bfc
+	cmp	r1,r0
+	beq	pcard_grom_read
+	adds	r0,#2
+	cmp	r1,r0			// compare 5bfe
+	beq	pcard_grom_read_address
+	adds	r0,#0x400		// 5ffe (we skip 5ffc)
+	cmp	r1,r0			// compare 5bfe
+	beq	pcard_grom_write_address
+	//adds	r0,#1
+	//cmp	r1,r0			// compare 5bfe
+	//beq	pcard_grom_write_address
+
+
+	ldr	r0,[r2,IDR]
+	tst	r0,#WE_MASK
+	beq	memen_loop
+// reading the PCARD DSR ROM(s)
+	vmov	r0, reg_moder_dataout
+	str	r0,[r2,C_TO_D_OFFSET + MODER]
+	// The PCARD 4K and 8K ROM are shoved into the rom_base instead of a regular ROM. 
+	// ie. we are shoving some DSR ROMs for the pcard into the 1st 12K of the normal
+	// 32K ROM space (since with the PCARD enabled I don't think you can use any other
+	// cartridge, and the stm32f407 doesnt have enough RAM to do have two seperate
+	// ROM spaces.
+	mov32	r0,#rom_base
+	sub	r1,#0x4000		// address 4000-5fff -> 0000-1fff
+	cmp	r1,#0x1000
+	blt	1$
+// top 4K of DSR space. We need to check the CRU bit that controls if we read the upper or lower 4K
+	vmov	r3,reg_fdc_system
+	tst	r3,#S_CRU_PCARD_A12
+	IT	NE
+	addne	r1,#0x1000		// address 1000-1fff -> 2000-2fff
+1$:
+	ldrb	r0,[r0,r1]
+	lsls	r0,r0,#8
+	str     r0,[r2, C_TO_D_OFFSET + ODR]
+	b	memen_loop
+
+pcard_grom_write_address:
+	ldr	r0,[r2,IDR]
+	tst	r0,#WE_MASK
+	bne	memen_loop
+	// 5FFE. write to the address counter
+	vmov	r0, reg_moder_datain
+	str	r0,[r2,C_TO_D_OFFSET + MODER]
+	// These NOPs seem to be required
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	vmov	r1,reg_pcard_grom_address_counter
+	// get data bus
+	ldr	r0,[r2, C_TO_D_OFFSET + IDR]
+	lsrs	r0,#8
+
+        vmov    r12,reg_ccmram_log
+	tst	r12,#0x00008000		// effectively make it stop logging when it fills the 64K CCM
+	IT	EQ
+        strheq   r0,[r12],#2     // store r1
+        vmov  reg_ccmram_log,r12
+
+	// Shift in the address 8 bits at a time. This seems to be the opposite of the doco I found, but it does work
+	lsls	r1,#8
+	bfi	r1,r0,#0,#8
+	bfc	r1, #16,#16		// and 0xffff
+	vmov	reg_pcard_grom_address_counter,r1
+	b	we_loop_wait
+
+
+	// 5BFC read data
+pcard_grom_read:
+	// bump address counter. Not too sure if we should do this for any read of 5bfc
+	vmov	r0, reg_pcard_grom_address_counter
+
+        //vmov    r12,reg_ccmram_log
+	//tst	r12,#0x00008000		// effectively make it stop logging when it fills the 64K CCM
+	//IT	EQ
+        //strheq   r0,[r12],#2     // store r1
+        //vmov  reg_ccmram_log,r12
+
+	mov	r12,r0			// we'll use r12 further down
+	adds	r0,#1
+	vmov 	reg_pcard_grom_address_counter, r0
+	ldr	r0,[r2,IDR]	// check _WE
+	tst	r0,#WE_MASK
+	beq	4$		// ignore writes
+	// must be a GROM read
+	vmov	r0, reg_moder_dataout
+	str	r0,[r2,C_TO_D_OFFSET + MODER]
+	// The 8 PCARD GROMs are loaded into the same space as where the normal cartridge GROMS
+	// would go. As mentioned earlier, I dont think there is a way to use a normal cartridge
+	// when the pcard is enabled. Unlike a normal cartridge that can have up to 40K of GROMs,
+	// I had to expand the grom_base area to 64K to accommodate all 8 PCARD GROMs
+	mov32	r0,#grom_base
+	ldrb	r0,[r0,r12]
+	lsls	r0,r0,#8
+	str	r0,[r2,C_TO_D_OFFSET + ODR]
+	ldr	r12,[r2,C_TO_E_OFFSET + IDR]
+
+4$:	ldr	r0,[r2,IDR]	
+	tst	r0,#MEMEN_MASK
+	bne	5$
+	ldr	r1,[r2,C_TO_E_OFFSET + IDR]
+	cmp	r1,r12
+	beq	4$
+5$:	
+	vmov	r0, reg_moder_datain
+	str	r0,[r2,C_TO_D_OFFSET + MODER]
+
+	b	memen_loop
+
+pcard_grom_read_address:
+	// not implemented
+	b	memen_loop
 
 fdc_controller:
 	tst	r1,#0x0001		// test the LSB A15. It must be zero
