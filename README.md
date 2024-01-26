@@ -47,7 +47,7 @@ See notes below on CRUIN
 ```
 Looking at the IO slot on the side of the TI 99/4A, with connections to the stm32f407 listed. I have used 
 the TI pin naming of the Address and databus pins. TI (in this era) used a numbering scheme that is the opposite of
-other vendors. A15 is the least significant bit of the address bus. A0 is the most signidificant. D7 is the least
+other vendors. A15 is the least significant bit of the address bus. A0 is the most significant. D7 is the least
 significant bit of the data bus. D0 is the most significant.
 ```
 Pins 1 and 2 are closest to the front of the TI 99/4A
@@ -86,7 +86,7 @@ is fine.
 
 The  DEVEBOX stm32f407 board I used during development has an LED attached to PA1, so various errors will result in PA1 flashing.
 
-It is simpler if you just tie the GND pins of the STM32407 board to the TI 99/4A , and power the stm32407 board seperately from a 
+It is simpler if you just tie the GND pins of the STM32407 board to the TI 99/4A , and power the stm32407 board separately from a 
 USB cable. This just makes it easier to cycle through games on the SD card while the TI 99/4A is turned off.
 
 Setting up the micro SD card and using it
@@ -100,7 +100,7 @@ FAT32.
   - Create a directory called 'ti994a' in the root of the SD card
   - Create a directory for each game or application within the 'ti994a' directory and put the related ROM, GROM and DSK files in to that directory.
     The suffix of a filename is used to determine what to do with the file. C.BIN and D.BIN files ends up as ROMs. G.BIN files end up as the GROM. 
-    .DSK files end up as disks. Anything else is treated like an 'up to 32K ROM'. Only Single Sided Single Densiy (SSSD) and Double Sided Single
+    .DSK files end up as disks. Anything else is treated like an 'up to 32K ROM'. Only Single Sided Single Density (SSSD) and Double Sided Single
     Density (DSSD) raw dsk images are supported (ie. 92160 or 184320 bytes). You can have up to three disk images in the one directory. The DSK1
     image needs to end in .DSK or .DSK1, the DSK2 image must end in .DSK2. The DSK3 image must end in .DSK3
     Some examples:
@@ -139,7 +139,7 @@ a letter key and the TI-99/4A should reboot. If you 'press a key' you should see
 start your application.
 
 After you've run a program you can try to reset the TI-99/4A with FCTN-= or if that does not work, turn the TI-99/4A off and on. If you pressed a key, 
-you would see the same program you last ran in the list (assuming the stm32f407 board is powered seperately). If you want to get back to the KCTFS menu, 
+you would see the same program you last ran in the list (assuming the stm32f407 board is powered separately). If you want to get back to the KCTFS menu, 
 press the MENU button, then press FCTN-= on the TI-99/4A. The TI/99-4A should reboot and then you can select KCTFS again.
 
 The NEXT and PREV buttons allow you to step through the directories on the SD card without having to go back to the KCTFS menu. Again, they are in the
@@ -303,7 +303,7 @@ Those pcard files I found in an archive for use with MAME.
 Now boot up the TI-99/4A. Go straight in to kctfs, find your 'pcard-test1' or
 whatever you called it and select. Now the TI-99/4A reboots and instead of the
 usual 'press any key' screen, you just have a cyan screen for quite some time
-(this is where that actiity LED comes in handy). Eventually you should see
+(this is where that activity LED comes in handy). Eventually you should see
 'System Initialised' and the top menu of the p-system.
 
 
@@ -312,7 +312,7 @@ Technical (for the TI 99/4A)
 
 The TI99/4A is quite a bit different to other home computers of the era. The CPU
 is 16 bit, yet the external bus is 8 bit. This means the main memory cycle is
-quite unsusual. _MEMEN goes low at the start of a memory bus cycle, but it's 
+quite unusual. _MEMEN goes low at the start of a memory bus cycle, but it's 
 always a 16 bit operation split into at least two halves. The first half is with the
 lowest address bit A15 going high, then half way through the cycle it generally 
 goes low.
@@ -336,7 +336,7 @@ The interrupt routine that services _MEMEN needs to:
    interface steals 16 bytes of this at 0x5fe0.
  - See if its a read or write to the Floppy Controller chip at 0x5ff0 - 0x5fff
 
-In addition we have a seperate interrupt on the -ve edge of CRUCLK. This is to 
+In addition we have a separate interrupt on the -ve edge of CRUCLK. This is to 
 catch CRU output requests (CRU is a bit setting/resetting/reading interface
 that the TMS9900 has). We are only interested in the 0x11xx CRU output bits as 
 these relate to the Floppy Disk Controller. Three bits are used for drive selection
