@@ -8,6 +8,7 @@ More info at   https://www.kernelcrash.com/blog/the-ti-99-4a
 
 Heavily based on all the other rom/fdc emulators at https://www.kernelcrash.com
 
+It won't work if you have a QI motherboard TI99/4A.
 
 Overview
 --------
